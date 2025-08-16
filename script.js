@@ -54,6 +54,70 @@ const modalTitle = document.getElementById('modalTitle');
 const modalContent = document.getElementById('modalContent');
 const closeModal = document.getElementById('closeModal');
 
+// === Paginación ===
+let currentPage = 1;
+let pageSize = 12;
+
+const pageInfoEl = document.getElementById('pageInfo');
+const currentEl  = document.getElementById('currentPage');
+const totalEl    = document.getElementById('totalPages');
+const pageSizeEl = document.getElementById('pageSize');
+
+const firstBtn = document.getElementById('firstPage');
+const prevBtn  = document.getElementById('prevPage');
+const nextBtn  = document.getElementById('nextPage');
+const lastBtn  = document.getElementById('lastPage');
+
+function renderPage(pageNum = 1) {
+  const data = state.shown;
+  const totalItems = data.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // Limitar página
+  currentPage = Math.min(Math.max(1, pageNum), totalPages);
+
+  const start = (currentPage - 1) * pageSize;
+  const end   = start + pageSize;
+  const slice = data.slice(start, end);
+
+  // Mostrar/ocultar estado vacío (solo si NO hay resultados totales)
+  emptyState.classList.toggle('hidden', totalItems !== 0);
+
+  // Pintar solo la página actual
+  renderGrid(slice);
+
+  // Actualizar UI de paginación
+  updatePaginationUI({ currentPage, totalPages, totalItems });
+}
+
+function updatePaginationUI({ currentPage, totalPages, totalItems }) {
+  if (currentEl)  currentEl.textContent  = String(currentPage);
+  if (totalEl)    totalEl.textContent    = String(totalPages);
+  if (pageInfoEl) pageInfoEl.textContent = `Página ${currentPage} de ${totalPages} · ${totalItems} resultados`;
+
+  const atFirst = currentPage === 1;
+  const atLast  = currentPage === totalPages;
+
+  if (firstBtn) firstBtn.disabled = atFirst;
+  if (prevBtn)  prevBtn.disabled  = atFirst;
+  if (nextBtn)  nextBtn.disabled  = atLast;
+  if (lastBtn)  lastBtn.disabled  = atLast;
+}
+
+// Listeners de paginación
+firstBtn?.addEventListener('click', () => renderPage(1));
+prevBtn?.addEventListener('click', () => renderPage(currentPage - 1));
+nextBtn?.addEventListener('click', () => renderPage(currentPage + 1));
+lastBtn?.addEventListener('click', () => {
+  const totalPages = Math.max(1, Math.ceil(state.shown.length / pageSize));
+  renderPage(totalPages);
+});
+
+pageSizeEl?.addEventListener('change', () => {
+  pageSize = parseInt(pageSizeEl.value, 10) || 12;
+  renderPage(1); // al cambiar tamaño, volver a la primera
+});
+
 // === Init ===
 document.addEventListener('DOMContentLoaded', async () => {
   setupTypeChips();
@@ -61,7 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   showLoading(true);
   await loadInitial();
   showLoading(false);
-  computeAndRender();
+  computeAndRender(); // esto termina llamando a renderPage(1)
 });
 
 // === Carga inicial ===
@@ -241,17 +305,21 @@ function computeAndRender() {
   }
 
   state.shown = list;
-  renderGrid();
+
+  // ⚠️ Importante: al cambiar filtros/orden, iniciar en página 1
+  renderPage(1);
 }
 
 // === Render ===
-function renderGrid() {
+function renderGrid(list = null) {
+  // Si no me pasan una lista, yo misma recorto según la página actual
+  const data = Array.isArray(list)
+    ? list
+    : state.shown.slice((currentPage - 1) * pageSize, (currentPage - 1) * pageSize + pageSize);
+
   grid.innerHTML = '';
 
-  // estados
-  emptyState.classList.toggle('hidden', state.shown.length !== 0);
-
-  state.shown.forEach(p => {
+  data.forEach(p => {
     const card = document.createElement('article');
     card.className = 'card';
 
